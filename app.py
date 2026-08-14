@@ -25,35 +25,38 @@ app = Dash(__name__, use_pages=True, suppress_callback_exceptions=True)
 app.title = "Barrier Option Pricing — Path Integral Methods"
 server = app.server  # exposed for gunicorn / Render
 
-app.layout = html.Div(style={
-    "backgroundColor": BG, "minHeight": "100vh",
-    "fontFamily": "Georgia, serif",
-}, children=[
-
-    # ── Top nav bar, present on every page ────────────────────────────────
-    html.Div(style={
-        "backgroundColor": "white", "borderBottom": f"1px solid {LGRAY}",
-        "padding": "14px 32px", "display": "flex", "alignItems": "center",
-        "justifyContent": "space-between", "flexWrap": "wrap", "gap": "10px",
+def serve_layout():
+    return html.Div(style={
+        "backgroundColor": BG, "minHeight": "100vh",
+        "fontFamily": "Georgia, serif",
     }, children=[
-        dcc.Link(
-            "Barrier Option Pricing — Path Integral Methods",
-            href="/",
-            style={"fontSize": "16px", "fontWeight": "700", "color": DARK,
-                   "textDecoration": "none"},
-        ),
-        html.Div(style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
-                  children=[
-            dcc.Link(page["name"], href=page["path"], style={
-                "fontSize": "12px", "color": BLUE, "textDecoration": "none",
-                "fontFamily": "Georgia, serif",
-            })
-            for page in dash.page_registry.values()
-        ]),
-    ]),
 
-    page_container,
-])
+        # ── Top nav bar, present on every page ────────────────────────────────
+        html.Div(style={
+            "backgroundColor": "white", "borderBottom": f"1px solid {LGRAY}",
+            "padding": "14px 32px", "display": "flex", "alignItems": "center",
+            "justifyContent": "space-between", "flexWrap": "wrap", "gap": "10px",
+        }, children=[
+            dcc.Link(
+                "Barrier Option Pricing — Path Integral Methods",
+                href="/",
+                style={"fontSize": "16px", "fontWeight": "700", "color": DARK,
+                       "textDecoration": "none"},
+            ),
+            html.Div(style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
+                      children=[
+                dcc.Link(page["name"], href=page["relative_path"], style={
+                    "fontSize": "12px", "color": BLUE, "textDecoration": "none",
+                    "fontFamily": "Georgia, serif",
+                })
+                for page in dash.page_registry.values()
+            ]),
+        ]),
+
+        page_container,
+    ])
+
+app.layout = serve_layout
 
 
 if __name__ == "__main__":
