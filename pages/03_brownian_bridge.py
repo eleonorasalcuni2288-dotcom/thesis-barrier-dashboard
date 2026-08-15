@@ -6,11 +6,20 @@ Adapted from the original standalone dashboard
 from the shared pricing_bs module instead of the local _rr/_rr_components
 duplicate (verified numerically equivalent).
 
-FIX: the log-log bias chart's x-axis now uses explicit tickvals/ticktext
-(STEP_GRID values, as strings) instead of letting Plotly auto-generate
-log-scale tick labels. Plotly's default log-axis tick formatter
-abbreviates non-decade ticks (20 -> "2", 500 -> "5") when space is
-tight, which looked like duplicated/wrong values in the deployed app.
+FIX 1: the log-log bias chart's x-axis now uses explicit
+tickvals/ticktext (STEP_GRID values, as strings) instead of letting
+Plotly auto-generate log-scale tick labels. Plotly's default log-axis
+tick formatter abbreviates non-decade ticks (20 -> "2", 500 -> "5")
+when space is tight, which looked like duplicated/wrong values in the
+deployed app.
+
+FIX 2: the SE Reduction and MSE decomposition bar charts now force
+type="category" on their x-axis. Without this, Plotly auto-detects the
+numeric-looking bar labels ("10","20",...,"504") and switches to a
+linear numeric axis, computing bar width from the *smallest* gap
+between consecutive values (10 -> 20 = 10 units). On a linear axis
+spanning 10-504 that made every bar except the first one nearly
+invisible (they looked "squished" at the left edge).
 """
 
 import dash
@@ -261,11 +270,8 @@ def update_graphs(data):
     f2.add_trace(go.Scatter(x=STEP_GRID, y=ref_one, mode="lines", name="O(N\u207b\u00b9\u00b7\u2070)",
         line=dict(color=BLUE, width=1, dash="dot"), opacity=0.6))
     f2.update_layout(**base, title=dict(text="Log-log bias comparison", font=dict(size=12)))
-    # FIX: explicit tickvals/ticktext instead of Plotly's auto log-axis
-    # ticks, which abbreviate non-decade values (20 -> "2", 500 -> "5")
-    # and looked wrong/duplicated in the deployed app.
     f2.update_xaxes(title_text="N", type="log",
-                     tickvals=STEP_GRID, ticktext=[str(n) for n in STEP_GRID])
+                    tickvals=STEP_GRID, ticktext=[str(n) for n in STEP_GRID])
     f2.update_yaxes(title_text="|bias|", type="log")
 
     # ── SE ratio ─────────────────────────────────────────────────────────
@@ -280,31 +286,33 @@ def update_graphs(data):
         f3.add_annotation(x=str(STEP_GRID[i]), y=max(naive_se[i], bb_se[i]) * 1000 + 0.03,
             text=f"{r_:.1f}\u00d7", showarrow=False, font=dict(size=9, color=DARK))
     f3.update_layout(**base, barmode="overlay", title=dict(text="SE Reduction  (Rao-Blackwell)", font=dict(size=12)))
-    # FIX: force categorical x-axis. Without this, Plotly auto-detects
-    # the numeric-looking labels ("10","20",...,"504") and switches to a
-    # linear numeric axis, then computes bar width from the *smallest*
-    # gap between consecutive values (10 -> 20 = 10 units). On a linear
-    # axis spanning 10-504 that makes every bar except the first one
-    # nearly invisible (they all look "squished" at the left).
     f3.update_xaxes(title_text="Time steps N", type="category")
     f3.update_yaxes(title_text="SE (\u00d710\u207b\u00b3)")
 
     # ── MSE decomposition ────────────────────────────────────────────────
     bias2_n = (naive_p - bs_val) ** 2; var_n = naive_se ** 2
     bias2_b = (bb_p - bs_val) ** 2; var_b = bb_se ** 2
+    step_str = [str(n) for n in STEP_GRID]
 
-    f4 = make_subplots(rows=1, cols=2, subplot_titles=["MC Naive", "MC Brownian Bridge"])
-    for col, (b2, va, cb, cv) in enumerate([(bias2_n, var_n, FUCHSIA, LFUCHSIA),
-                                             (bias2_b, var_b, BLUE, LBLUE)], 1):
-        f4.add_trace(go.Bar(x=STEP_GRID, y=b2 * 1e4, name="Bias\u00b2",
-            marker_color=cb, showlegend=(col == 1)), row=1, col=col)
-        f4.add_trace(go.Bar(x=STEP_GRID, y=va * 1e4, name="Variance",
-            marker_color=cv, showlegend=(col == 1)), row=1, col=col)
+    f4 = make_subplots(rows=1, cols=2, subplot_titles=["MC Naive", "MC Brownian Bridge"],
+                       horizontal_spacing=0.12)
+
+    # Subplot 1: Naive (Fuchsia)
+    f4.add_trace(go.Bar(x=step_str, y=bias2_n * 1e4, name="Bias\u00b2 (Naive)",
+                        marker_color=FUCHSIA, legendgroup="naive"), row=1, col=1)
+    f4.add_trace(go.Bar(x=step_str, y=var_n * 1e4, name="Variance (Naive)",
+                        marker_color=LFUCHSIA, legendgroup="naive"), row=1, col=1)
+
+    # Subplot 2: Brownian Bridge (Blue)
+    f4.add_trace(go.Bar(x=step_str, y=bias2_b * 1e4, name="Bias\u00b2 (BB)",
+                        marker_color=BLUE, legendgroup="bb"), row=1, col=2)
+    f4.add_trace(go.Bar(x=step_str, y=var_b * 1e4, name="Variance (BB)",
+                        marker_color=LBLUE, legendgroup="bb"), row=1, col=2)
+
     f4.update_layout(**base, barmode="stack", title=dict(text="MSE = Bias\u00b2 + Variance  (\u00d710\u207b\u2074)", font=dict(size=12)))
-    # Same categorical-axis fix as f3, and force the same tickvals as
-    # subplot 1 so both mini-panels line up (Plotly can otherwise pick
-    # different tick sets per subplot even with matching axis type).
-    f4.update_xaxes(title_text="N", type="category")
-    f4.update_yaxes(title_text="MSE (\u00d710\u207b\u2074)")
+    
+    # Applica griglia, stile e modalità categoria a ENTRAMBI i subplot
+    f4.update_xaxes(title_text="N", type="category", gridcolor=LGRAY, showgrid=True)
+    f4.update_yaxes(title_text="MSE (\u00d710\u207b\u2074)", gridcolor=LGRAY, showgrid=True)
 
     return f1, f2, f3, f4
