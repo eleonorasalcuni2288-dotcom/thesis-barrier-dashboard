@@ -5,6 +5,12 @@ Adapted from the original standalone dashboard
 (dashboard_brownian_bridge.py, port 8052). Pricing formulas now come
 from the shared pricing_bs module instead of the local _rr/_rr_components
 duplicate (verified numerically equivalent).
+
+FIX: the log-log bias chart's x-axis now uses explicit tickvals/ticktext
+(STEP_GRID values, as strings) instead of letting Plotly auto-generate
+log-scale tick labels. Plotly's default log-axis tick formatter
+abbreviates non-decade ticks (20 -> "2", 500 -> "5") when space is
+tight, which looked like duplicated/wrong values in the deployed app.
 """
 
 import dash
@@ -255,7 +261,12 @@ def update_graphs(data):
     f2.add_trace(go.Scatter(x=STEP_GRID, y=ref_one, mode="lines", name="O(N\u207b\u00b9\u00b7\u2070)",
         line=dict(color=BLUE, width=1, dash="dot"), opacity=0.6))
     f2.update_layout(**base, title=dict(text="Log-log bias comparison", font=dict(size=12)))
-    f2.update_xaxes(title_text="N", type="log"); f2.update_yaxes(title_text="|bias|", type="log")
+    # FIX: explicit tickvals/ticktext instead of Plotly's auto log-axis
+    # ticks, which abbreviate non-decade values (20 -> "2", 500 -> "5")
+    # and looked wrong/duplicated in the deployed app.
+    f2.update_xaxes(title_text="N", type="log",
+                     tickvals=STEP_GRID, ticktext=[str(n) for n in STEP_GRID])
+    f2.update_yaxes(title_text="|bias|", type="log")
 
     # ── SE ratio ─────────────────────────────────────────────────────────
     se_ratio = naive_se / bb_se
