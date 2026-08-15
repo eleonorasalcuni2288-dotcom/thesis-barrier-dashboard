@@ -470,31 +470,54 @@ def update_graphs(data):
 
     # 3. Standard Error Reduction
     se_ratio = naive_se / bb_se
+    x_labels = [str(n) for n in STEP_GRID]
+
     f3 = go.Figure()
     f3.add_trace(go.Bar(
-        x=[str(n) for n in STEP_GRID], y=naive_se * 1000, name="Naive SE",
-        marker_color=LFUCHSIA, marker_line_color=FUCHSIA, marker_line_width=1
+        x=x_labels, 
+        y=naive_se * 1000, 
+        name="Naive SE",
+        marker_color=LFUCHSIA, 
+        marker_line_color=FUCHSIA, 
+        marker_line_width=1
     ))
     f3.add_trace(go.Bar(
-        x=[str(n) for n in STEP_GRID], y=bb_se * 1000, name="BB SE",
-        marker_color=LBLUE, marker_line_color=BLUE, marker_line_width=1, opacity=0.85
+        x=x_labels, 
+        y=bb_se * 1000, 
+        name="BB SE",
+        marker_color=LBLUE, 
+        marker_line_color=BLUE, 
+        marker_line_width=1, 
+        opacity=0.85
     ))
+    
     for i, r_ in enumerate(se_ratio):
         f3.add_annotation(
-            x=str(STEP_GRID[i]),
-            y=max(naive_se[i], bb_se[i]) * 1000 + 0.03,
-            text=f"{r_:.1f}×", showarrow=False,
-            font=dict(size=9, color=DARK)
+            x=x_labels[i],
+            y=max(naive_se[i], bb_se[i]) * 1000 + 1.5,
+            text=f"{r_:.1f}×", 
+            showarrow=False,
+            font=dict(size=10, color=DARK)
         )
+        
     f3.update_layout(
-        **base, barmode="group", bargap=0.25, bargroupgap=0.05,
+        **base, 
+        barmode="group", 
+        bargap=0.2, 
+        bargroupgap=0.05,
         title=dict(text="SE Reduction (Rao-Blackwell)", font=dict(size=12))
     )
     f3.update_xaxes(
-        title_text="Time steps N", type="category",
-        categoryorder="array", categoryarray=[str(n) for n in STEP_GRID], showgrid=False
+        title_text="Time steps N", 
+        type="category", 
+        showgrid=False
     )
-    f3.update_yaxes(title_text="SE (×10⁻³)", showgrid=True, gridcolor=LGRAY, gridwidth=1)
+    f3.update_yaxes(
+        title_text="SE (×10⁻³)", 
+        showgrid=True, 
+        gridcolor=LGRAY, 
+        gridwidth=1
+    )
 
     # 4. MSE Decomposition (Bias² vs Variance)
     bias2_n = (naive_p - bs_val) ** 2
@@ -507,26 +530,35 @@ def update_graphs(data):
         subplot_titles=["MC Naive", "MC Brownian Bridge"]
     )
 
-    for col, (b2, va, cb, cv) in enumerate(
-        [(bias2_n, var_n, FUCHSIA, LFUCHSIA), (bias2_b, var_b, BLUE, LBLUE)], 1
-    ):
-        f4.add_trace(go.Bar(
-            x=[str(n) for n in STEP_GRID], y=b2 * 1e4, name="Bias²",
-            marker_color=cb, showlegend=(col == 1)
-        ), row=1, col=col)
-        f4.add_trace(go.Bar(
-            x=[str(n) for n in STEP_GRID], y=va * 1e4, name="Variance",
-            marker_color=cv, showlegend=(col == 1)
-        ), row=1, col=col)
+    # MC Naive Subplot
+    f4.add_trace(go.Bar(
+        x=x_labels, y=bias2_n * 1e4, name="Bias²",
+        marker_color=FUCHSIA, showlegend=True
+    ), row=1, col=1)
+    f4.add_trace(go.Bar(
+        x=x_labels, y=var_n * 1e4, name="Variance",
+        marker_color=LFUCHSIA, showlegend=True
+    ), row=1, col=1)
+
+    # MC Brownian Bridge Subplot
+    f4.add_trace(go.Bar(
+        x=x_labels, y=bias2_b * 1e4, name="Bias²",
+        marker_color=BLUE, showlegend=False
+    ), row=1, col=2)
+    f4.add_trace(go.Bar(
+        x=x_labels, y=var_b * 1e4, name="Variance",
+        marker_color=LBLUE, showlegend=False
+    ), row=1, col=2)
 
     f4.update_layout(
         **base, barmode="stack",
         title=dict(text="MSE = Bias² + Variance (×10⁻⁴)", font=dict(size=12))
     )
     f4.update_xaxes(
-        title_text="N", type="category", showgrid=True, gridcolor=LGRAY, gridwidth=1,
-        categoryorder="array", categoryarray=[str(n) for n in STEP_GRID]
+        title_text="N", type="category", showgrid=True, gridcolor=LGRAY, gridwidth=1
     )
-    f4.update_yaxes(title_text="MSE (×10⁻⁴)", showgrid=True, gridcolor=LGRAY, gridwidth=1)
+    f4.update_yaxes(
+        title_text="MSE (×10⁻⁴)", showgrid=True, gridcolor=LGRAY, gridwidth=1, matches=None
+    )
 
     return f1, f2, f3, f4
