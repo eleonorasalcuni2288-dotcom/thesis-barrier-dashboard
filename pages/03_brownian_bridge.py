@@ -405,6 +405,8 @@ def update_graphs(data):
     bb_se = np.array(data["bb_se"])
     bs_val = data["bs_val"]
 
+    x_labels = [str(n) for n in STEP_GRID]
+
     base = dict(
         paper_bgcolor=BG,
         plot_bgcolor=BG,
@@ -470,7 +472,6 @@ def update_graphs(data):
 
     # 3. Standard Error Reduction
     se_ratio = naive_se / bb_se
-    x_labels = [str(n) for n in STEP_GRID]
 
     f3 = go.Figure()
     f3.add_trace(go.Bar(
@@ -555,7 +556,7 @@ def update_graphs(data):
         title=dict(text="MSE = Bias² + Variance (×10⁻⁴)", font=dict(size=12))
     )
     f4.update_xaxes(
-        title_text="N", type="category", showgrid=True, gridcolor=LGRAY, gridwidth=1
+        title_text="N", type="category", showgrid=False
     )
     f4.update_yaxes(
         title_text="MSE (×10⁻⁴)", showgrid=True, gridcolor=LGRAY, gridwidth=1, matches=None
