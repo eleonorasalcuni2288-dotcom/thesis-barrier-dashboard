@@ -280,7 +280,14 @@ def update_graphs(data):
         f3.add_annotation(x=str(STEP_GRID[i]), y=max(naive_se[i], bb_se[i]) * 1000 + 0.03,
             text=f"{r_:.1f}\u00d7", showarrow=False, font=dict(size=9, color=DARK))
     f3.update_layout(**base, barmode="overlay", title=dict(text="SE Reduction  (Rao-Blackwell)", font=dict(size=12)))
-    f3.update_xaxes(title_text="Time steps N"); f3.update_yaxes(title_text="SE (\u00d710\u207b\u00b3)")
+    # FIX: force categorical x-axis. Without this, Plotly auto-detects
+    # the numeric-looking labels ("10","20",...,"504") and switches to a
+    # linear numeric axis, then computes bar width from the *smallest*
+    # gap between consecutive values (10 -> 20 = 10 units). On a linear
+    # axis spanning 10-504 that makes every bar except the first one
+    # nearly invisible (they all look "squished" at the left).
+    f3.update_xaxes(title_text="Time steps N", type="category")
+    f3.update_yaxes(title_text="SE (\u00d710\u207b\u00b3)")
 
     # ── MSE decomposition ────────────────────────────────────────────────
     bias2_n = (naive_p - bs_val) ** 2; var_n = naive_se ** 2
@@ -294,6 +301,10 @@ def update_graphs(data):
         f4.add_trace(go.Bar(x=STEP_GRID, y=va * 1e4, name="Variance",
             marker_color=cv, showlegend=(col == 1)), row=1, col=col)
     f4.update_layout(**base, barmode="stack", title=dict(text="MSE = Bias\u00b2 + Variance  (\u00d710\u207b\u2074)", font=dict(size=12)))
-    f4.update_xaxes(title_text="N"); f4.update_yaxes(title_text="MSE (\u00d710\u207b\u2074)")
+    # Same categorical-axis fix as f3, and force the same tickvals as
+    # subplot 1 so both mini-panels line up (Plotly can otherwise pick
+    # different tick sets per subplot even with matching axis type).
+    f4.update_xaxes(title_text="N", type="category")
+    f4.update_yaxes(title_text="MSE (\u00d710\u207b\u2074)")
 
     return f1, f2, f3, f4
