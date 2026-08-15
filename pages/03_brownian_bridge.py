@@ -1,5 +1,25 @@
 """
 pages/03_brownian_bridge.py — Dashboard 3: Brownian Bridge Correction.
+
+Adapted from the original standalone dashboard
+(dashboard_brownian_bridge.py, port 8052). Pricing formulas now come
+from the shared pricing_bs module instead of the local _rr/_rr_components
+duplicate (verified numerically equivalent).
+
+FIX 1: the log-log bias chart's x-axis now uses explicit
+tickvals/ticktext (STEP_GRID values, as strings) instead of letting
+Plotly auto-generate log-scale tick labels. Plotly's default log-axis
+tick formatter abbreviates non-decade ticks (20 -> "2", 500 -> "5")
+when space is tight, which looked like duplicated/wrong values in the
+deployed app.
+
+FIX 2: the SE Reduction and MSE decomposition bar charts now force
+type="category" on their x-axis. Without this, Plotly auto-detects the
+numeric-looking bar labels ("10","20",...,"504") and switches to a
+linear numeric axis, computing bar width from the *smallest* gap
+between consecutive values (10 -> 20 = 10 units). On a linear axis
+spanning 10-504 that made every bar except the first one nearly
+invisible (they looked "squished" at the left edge).
 """
 
 import dash
@@ -206,15 +226,13 @@ def run_sim(n_clicks, h, sigma_pct, t_sc, r_pct, opt):
 )
 def update_graphs(data):
     empty = go.Figure().update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
-                                      xaxis=dict(visible=False), yaxis=dict(visible=False))
+                                       xaxis=dict(visible=False), yaxis=dict(visible=False))
     if data is None:
         return empty, empty, empty, empty
 
     naive_p = np.array(data["naive_p"]); naive_se = np.array(data["naive_se"])
     bb_p = np.array(data["bb_p"]); bb_se = np.array(data["bb_se"])
     bs_val = data["bs_val"]
-
-    categories = [str(n) for n in STEP_GRID]
 
     base = dict(paper_bgcolor=BG, plot_bgcolor=BG,
                 font=dict(family="Georgia,serif", color=DARK, size=11),
@@ -252,79 +270,42 @@ def update_graphs(data):
     f2.add_trace(go.Scatter(x=STEP_GRID, y=ref_one, mode="lines", name="O(N\u207b\u00b9\u00b7\u2070)",
         line=dict(color=BLUE, width=1, dash="dot"), opacity=0.6))
     f2.update_layout(**base, title=dict(text="Log-log bias comparison", font=dict(size=12)))
+    # FIX 1: explicit tickvals/ticktext instead of Plotly's auto log-axis
+    # ticks, which abbreviate non-decade values (20 -> "2", 500 -> "5").
     f2.update_xaxes(title_text="N", type="log",
-                    tickvals=STEP_GRID, ticktext=categories)
+                     tickvals=STEP_GRID, ticktext=[str(n) for n in STEP_GRID])
     f2.update_yaxes(title_text="|bias|", type="log")
 
-    # ── SE ratio (FIX BARRE DISSOCIATE E DISTRIBUITE) ─────────────────────
+    # ── SE ratio ─────────────────────────────────────────────────────────
     se_ratio = naive_se / bb_se
     f3 = go.Figure()
-    f3.add_trace(go.Bar(
-        x=categories, 
-        y=naive_se * 1000,
-        name="Naive SE", 
-        marker_color=LFUCHSIA, 
-        marker_line_color=FUCHSIA, 
-        marker_line_width=1
-    ))
-    f3.add_trace(go.Bar(
-        x=categories, 
-        y=bb_se * 1000,
-        name="BB SE", 
-        marker_color=LBLUE, 
-        marker_line_color=BLUE, 
-        marker_line_width=1, 
-        opacity=0.85
-    ))
     f3.add_hline(y=1, line_color=GRAY, line_dash="dash", line_width=1)
-
+    f3.add_trace(go.Bar(x=[str(n) for n in STEP_GRID], y=naive_se * 1000,
+        name="Naive SE", marker_color=LFUCHSIA, marker_line_color=FUCHSIA, marker_line_width=1))
+    f3.add_trace(go.Bar(x=[str(n) for n in STEP_GRID], y=bb_se * 1000,
+        name="BB SE", marker_color=LBLUE, marker_line_color=BLUE, marker_line_width=1, opacity=0.85))
     for i, r_ in enumerate(se_ratio):
-        f3.add_annotation(
-            x=categories[i], 
-            y=max(naive_se[i], bb_se[i]) * 1000 + 0.3,
-            text=f"{r_:.1f}\u00d7", 
-            showarrow=False, 
-            font=dict(size=9, color=DARK)
-        )
-    f3.update_layout(
-        **base, 
-        barmode="overlay", 
-        bargap=0.35, 
-        title=dict(text="SE Reduction  (Rao-Blackwell)", font=dict(size=12))
-    )
-    f3.update_xaxes(
-        type="category", 
-        categoryorder="array", 
-        categoryarray=categories,
-        title_text="Time steps N"
-    )
+        f3.add_annotation(x=str(STEP_GRID[i]), y=max(naive_se[i], bb_se[i]) * 1000 + 0.03,
+            text=f"{r_:.1f}\u00d7", showarrow=False, font=dict(size=9, color=DARK))
+    f3.update_layout(**base, barmode="overlay", title=dict(text="SE Reduction  (Rao-Blackwell)", font=dict(size=12)))
+    # FIX 2: force categorical x-axis (see module docstring for why).
+    f3.update_xaxes(title_text="Time steps N", type="category")
     f3.update_yaxes(title_text="SE (\u00d710\u207b\u00b3)")
 
-    # ── MSE decomposition ──────────────────────
+    # ── MSE decomposition ────────────────────────────────────────────────
     bias2_n = (naive_p - bs_val) ** 2; var_n = naive_se ** 2
     bias2_b = (bb_p - bs_val) ** 2; var_b = bb_se ** 2
 
     f4 = make_subplots(rows=1, cols=2, subplot_titles=["MC Naive", "MC Brownian Bridge"])
     for col, (b2, va, cb, cv) in enumerate([(bias2_n, var_n, FUCHSIA, LFUCHSIA),
-                                            (bias2_b, var_b, BLUE, LBLUE)], 1):
-        f4.add_trace(go.Bar(
-            x=categories, 
-            y=b2 * 1e4, 
-            name="Bias\u00b2",
-            marker_color=cb, 
-            showlegend=(col == 1)
-        ), row=1, col=col)
-        f4.add_trace(go.Bar(
-            x=categories, 
-            y=va * 1e4, 
-            name="Variance",
-            marker_color=cv, 
-            showlegend=(col == 1)
-        ), row=1, col=col)
-        
+                                             (bias2_b, var_b, BLUE, LBLUE)], 1):
+        f4.add_trace(go.Bar(x=STEP_GRID, y=b2 * 1e4, name="Bias\u00b2",
+            marker_color=cb, showlegend=(col == 1)), row=1, col=col)
+        f4.add_trace(go.Bar(x=STEP_GRID, y=va * 1e4, name="Variance",
+            marker_color=cv, showlegend=(col == 1)), row=1, col=col)
     f4.update_layout(**base, barmode="stack", title=dict(text="MSE = Bias\u00b2 + Variance  (\u00d710\u207b\u2074)", font=dict(size=12)))
-    f4.update_xaxes(type="category", categoryorder="array", categoryarray=categories, title_text="N", selector=dict())
-    f4.update_yaxes(gridcolor=LGRAY, showgrid=True, selector=dict())
-    f4.update_yaxes(title_text="MSE (\u00d710\u207b\u00b3)", row=1, col=1)
+    # FIX 2 (same as f3, applied to both subplot columns).
+    f4.update_xaxes(title_text="N", type="category")
+    f4.update_yaxes(title_text="MSE (\u00d710\u207b\u2074)")
 
     return f1, f2, f3, f4
